@@ -68,6 +68,58 @@ class TestDeleteTransactionsCases(unittest.TestCase):
             mngr.delete_transactions(invalid_iban, -5000)
         self.assertEqual(context.exception.message, "Invalid IBAN format")
 
+    def test_TC5_invalid_country_code(self):
+        """TC5: IBAN with invalid country code (GE)"""
+        invalid_iban = "GE12345678901234567890123"
+        mngr = AccountManager()
+        with self.assertRaises(AccountManagementException) as context:
+            mngr.delete_transactions(invalid_iban[:24], -5000)
+        self.assertEqual(context.exception.message, "Invalid IBAN format")
+
+    def test_TC6_all_D_characters(self):
+        """TC6: IBAN with all D characters, fails digit parsing"""
+        invalid_iban = "ESDDDDDDDDDDDDDDDDDDDDDD"
+        mngr = AccountManager()
+        with self.assertRaises(AccountManagementException) as context:
+            mngr.delete_transactions(invalid_iban, -5000)
+        self.assertEqual(context.exception.message, "Invalid IBAN format")
+
+    def test_TC7_invalid_control_digits(self):
+        """TC7: IBAN with valid format but invalid control digits"""
+        # Correct length and ES prefix but fails modulo 97 check
+        invalid_iban = "ES0059005439021242088295"
+        mngr = AccountManager()
+        with self.assertRaises(AccountManagementException) as context:
+            mngr.delete_transactions(invalid_iban, -5000)
+        self.assertEqual(context.exception.message, "Invalid IBAN format")
+
+    def test_TC8_valid_but_no_matching_transactions(self):
+        """TC8: Valid IBAN with no matching transactions in file"""
+        mngr = AccountManager()
+        unused_iban = "ES9820385778983000760236"  # 22 digits, valid format
+        with self.assertRaises(AccountManagementException) as context:
+            mngr.delete_transactions(unused_iban, -5000)
+        self.assertEqual(context.exception.message, "No transactions for the given IBAN")
+
+    def test_TC9_amount_out_of_bounds(self):
+        """TC9: Valid IBAN with valid transactions, but amount = -5001 (out of range)"""
+        mngr = AccountManager()
+        with self.assertRaises(AccountManagementException) as context:
+            mngr.delete_transactions(self.valid_iban, -5001)
+        self.assertEqual(context.exception.message, "Invalid amount value")
+
+    def test_TC10_amount_as_string(self):
+        """TC10: Amount is a string instead of integer, should raise datatype exception"""
+        mngr = AccountManager()
+        amount_as_string = "-5000"  # incorrect type
+
+        with self.assertRaises(AccountManagementException) as context:
+            mngr.delete_transactions(self.valid_iban, amount_as_string)
+
+        self.assertEqual(context.exception.message, "Invalid amount value")
+
+
+
 
 if __name__ == "__main__":
     unittest.main()
