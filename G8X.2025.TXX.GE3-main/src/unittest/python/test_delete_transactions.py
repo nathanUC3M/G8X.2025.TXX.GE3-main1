@@ -41,8 +41,21 @@ class TestDeleteTransactionsCases(unittest.TestCase):
         """TC1: Valid IBAN and amount -5000 (boundary) with matching transaction"""
         mngr = AccountManager()
         result = mngr.delete_transactions(self.valid_iban, -5000)
-        self.assertIsInstance(result, float)
-        self.assertGreater(result, 0)  # Should return remaining balance
+        self.assertEqual(result, 1000.0)
+
+        # Check that the deleted transactions file was created and has the right content
+        self.assertTrue(os.path.exists(DELETED_TRANSACTIONS_FILE))
+        with open(DELETED_TRANSACTIONS_FILE, "r", encoding="utf-8") as file:
+            deleted_data = json.load(file)
+        self.assertEqual(len(deleted_data), 1)
+        self.assertEqual(deleted_data[0]["amount"], "-5000")
+
+        # Check that the original transactions file is updated
+        with open(TRANSACTIONS_STORE_FILE, "r", encoding="utf-8") as file:
+            remaining_data = json.load(file)
+        self.assertEqual(len(remaining_data), 2) # a transaction for another iban is there
+        remaining_ibans = {tx["IBAN"] for tx in remaining_data}
+        self.assertIn(self.valid_iban, remaining_ibans)
 
     def test_TC2_invalid_iban_23_chars(self):
         """TC2: Invalid IBAN (23 digits)"""
@@ -91,7 +104,7 @@ class TestDeleteTransactionsCases(unittest.TestCase):
         mngr = AccountManager()
         with self.assertRaises(AccountManagementException) as context:
             mngr.delete_transactions(invalid_iban, -5000)
-        self.assertEqual(context.exception.message, "Invalid IBAN format")
+        self.assertEqual(context.exception.message, "Invalid IBAN control digit")
 
     def test_TC8_valid_but_no_matching_transactions(self):
         """TC8: Valid IBAN with no matching transactions in file"""
@@ -118,7 +131,28 @@ class TestDeleteTransactionsCases(unittest.TestCase):
 
         self.assertEqual(context.exception.message, "Invalid amount value")
 
+    def test_TC11_positive_amount(self):
+        """TC11: Valid IBAN and positive amount with matching transaction"""
+        mngr = AccountManager()
+        result = mngr.delete_transactions(self.valid_iban, 1000)
+        self.assertEqual(result, -5000.0)
 
+        # Check that the deleted transactions file was created and has the right content
+        self.assertTrue(os.path.exists(DELETED_TRANSACTIONS_FILE))
+        with open(DELETED_TRANSACTIONS_FILE, "r", encoding="utf-8") as file:
+            deleted_data = json.load(file)
+        self.assertEqual(len(deleted_data), 1)
+        self.assertEqual(deleted_data[0]["amount"], "1000")
+
+    def test_TC12_no_transactions_match_criteria(self):
+        """TC12: Valid IBAN, but no transactions match the deletion criteria"""
+        mngr = AccountManager()
+        with self.assertRaises(AccountManagementException) as context:
+            mngr.delete_transactions(self.valid_iban, 2000)
+        self.assertEqual(context.exception.message, "No transactions match the deletion criteria")
+
+        # Make sure no deleted_transactions.json file was created
+        self.assertFalse(os.path.exists(DELETED_TRANSACTIONS_FILE))
 
 
 if __name__ == "__main__":

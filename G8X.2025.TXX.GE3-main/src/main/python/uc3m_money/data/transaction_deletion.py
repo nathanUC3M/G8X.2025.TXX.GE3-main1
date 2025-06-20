@@ -17,8 +17,8 @@ class TransactionDeletion:
     def _validate_iban(self, iban_input: str) -> str:
         try:
             return IbanCode(iban_input).value
-        except AccountManagementException:
-            raise AccountManagementException("Invalid IBAN format")
+        except AccountManagementException as ex:
+            raise AccountManagementException(ex.message) from ex
 
     def _validate_amount(self, amount_input) -> int:
         if not isinstance(amount_input, int) or amount_input < -5000 or amount_input > 5000:
