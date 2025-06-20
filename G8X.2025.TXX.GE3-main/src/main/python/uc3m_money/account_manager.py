@@ -8,6 +8,8 @@ from uc3m_money.data.account_deposit import AccountDeposit
 from uc3m_money.data.iban_balance import IbanBalance
 from uc3m_money.storage.transactions_json_store import TransactionsJsonStore
 from uc3m_money.cfg.account_management_config import JSON_FILES_PATH
+from uc3m_money.data.transaction_deletion import TransactionDeletion
+
 
 class AccountManager:
     """singleton account manager"""
@@ -48,55 +50,7 @@ class AccountManager:
             return True
 
         def delete_transactions(self, IBAN: str, amount: int) -> float:
-            """Deletes transactions for an IBAN based on the given amount"""
-            # Validate IBAN format and control digit
-            try:
-                iban_obj = IbanCode(IBAN)
-                iban = iban_obj.value
-            except AccountManagementException:
-                raise AccountManagementException("Invalid IBAN format")
-
-            # Validate amount range
-            if not isinstance(amount, int) or amount < -5000 or amount > 5000:
-                raise AccountManagementException("Invalid amount value")
-
-            transactions_store = TransactionsJsonStore()
-            transactions = transactions_store.find_all("IBAN", iban)
-
-            if not transactions:
-                raise AccountManagementException("No transactions for the given IBAN")
-
-            # Determine transactions to delete
-            if amount >= 0:
-                to_delete = [tx for tx in transactions if float(tx["amount"]) >= amount]
-            else:
-                to_delete = [tx for tx in transactions if float(tx["amount"]) <= amount]
-
-            if not to_delete:
-                raise AccountManagementException("No transactions match the deletion criteria")
-
-            # Delete matching transactions
-            transactions_store.load_list_from_file()
-            transactions_store._data_list = [tx for tx in transactions_store._data_list if
-                                             tx not in to_delete]
-            transactions_store.save_list_to_file()
-
-            # Save deleted transactions
-            deleted_file_path = os.path.join(JSON_FILES_PATH, "deleted_transactions.json")
-            if os.path.exists(deleted_file_path):
-                with open(deleted_file_path, "r", encoding="utf-8", newline="") as f:
-                    deleted = json.load(f)
-            else:
-                deleted = []
-
-            deleted.extend(to_delete)
-
-            with open(deleted_file_path, "w", encoding="utf-8", newline="") as f:
-                json.dump(deleted, f, indent=2)
-
-            # Return updated balance
-            iban_balance = IbanBalance(iban)
-            return iban_balance._balance  # Or use a public method/property if preferred
+            return TransactionDeletion(IBAN, amount).execute()
     instance = None
     def __new__(cls):
         if not AccountManager.instance:
