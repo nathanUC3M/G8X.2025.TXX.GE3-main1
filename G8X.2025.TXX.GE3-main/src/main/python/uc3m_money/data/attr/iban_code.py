@@ -15,6 +15,9 @@ class IbanCode(Attribute):
     def _validate( self, attr_value ):
         """Overrides the validate method to include the validation of the
         IBAN control digits """
+        if not isinstance(attr_value, str):
+            raise AccountManagementException("Invalid IBAN format")
+
         attr_value = super()._validate(attr_value)
         iban = attr_value
         original_code = iban[2:4]
